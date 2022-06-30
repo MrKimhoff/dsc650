@@ -1,0 +1,430 @@
+<html>
+<head>
+<title>assignment05_5-1_ImhofTaylor.ipynb</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #808080;}
+.s1 { color: #a9b7c6;}
+.s2 { color: #cc7832;}
+.s3 { color: #6897bb;}
+.s4 { color: #6a8759;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+assignment05_5-1_ImhofTaylor.ipynb</font>
+</center></td></tr></table>
+<pre><span class="s0">#%% md 
+</span><span class="s1"># Taylor Imhof 
+# Bellevue University | DSC 650 
+# Assignment05 
+# Date: 6/26/2022 
+</span><span class="s0">#%% md 
+</span><span class="s1"># Movie Review Classifier 
+</span><span class="s0">#%% 
+# import imdb dataset from keras</span>
+<span class="s2">from </span><span class="s1">tensorflow.keras.datasets </span><span class="s2">import </span><span class="s1">imdb</span>
+<span class="s0">#%% 
+# load imdb movie dataset from TF</span>
+<span class="s1">(train_data</span><span class="s2">, </span><span class="s1">train_labels)</span><span class="s2">, </span><span class="s1">(test_data</span><span class="s2">, </span><span class="s1">test_labels) = imdb.load_data(num_words=</span><span class="s3">10000</span><span class="s1">)</span>
+<span class="s0">#%% 
+</span><span class="s1">train_data[:</span><span class="s3">5</span><span class="s1">]</span>
+<span class="s0">#%% 
+</span><span class="s1">train_labels[:</span><span class="s3">5</span><span class="s1">]</span>
+<span class="s0">#%% 
+# word index is restricted to &lt; 10,000</span>
+<span class="s0"># set by passing num_words param to imdb.load_data()</span>
+<span class="s1">max([max(sequence) </span><span class="s2">for </span><span class="s1">sequence </span><span class="s2">in </span><span class="s1">train_data])</span>
+<span class="s0">#%% 
+# decoding reviews back to text</span>
+<span class="s1">word_index = imdb.get_word_index()</span>
+<span class="s1">reverse_word_index = dict(</span>
+    <span class="s1">[(value</span><span class="s2">,</span><span class="s1">key) </span><span class="s2">for </span><span class="s1">(key</span><span class="s2">,</span><span class="s1">value) </span><span class="s2">in </span><span class="s1">word_index.items()]</span>
+<span class="s1">)</span>
+<span class="s1">decoded_review = </span><span class="s4">&quot; &quot;</span><span class="s1">.join(</span>
+    <span class="s1">[reverse_word_index.get(i-</span><span class="s3">3</span><span class="s2">,</span><span class="s4">&quot;?&quot;</span><span class="s1">) </span><span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">train_data[</span><span class="s3">0</span><span class="s1">]]</span>
+<span class="s1">)</span>
+<span class="s0">#%% 
+</span><span class="s1">type(decoded_review)</span>
+<span class="s1">decoded_review</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Preparing the data 
+ - pad lists to have same length 
+ - change to integer tensor of shape(samples, max_length) 
+ - embedding to start capable model 
+ - multi-hot encode to turn into vectors of 0s and 1s 
+</span><span class="s0">#%% 
+</span><span class="s2">import </span><span class="s1">numpy </span><span class="s2">as </span><span class="s1">np</span>
+<span class="s2">def </span><span class="s1">vectorize_sequences(sequences</span><span class="s2">, </span><span class="s1">dimension=</span><span class="s3">10000</span><span class="s1">):</span>
+    <span class="s1">results = np.zeros((len(sequences)</span><span class="s2">, </span><span class="s1">dimension))</span>
+    <span class="s2">for </span><span class="s1">i</span><span class="s2">, </span><span class="s1">sequence </span><span class="s2">in </span><span class="s1">enumerate(sequences):</span>
+        <span class="s2">for </span><span class="s1">j </span><span class="s2">in </span><span class="s1">sequence:</span>
+            <span class="s1">results[i</span><span class="s2">,</span><span class="s1">j] = </span><span class="s3">1</span>
+    <span class="s2">return </span><span class="s1">results</span>
+
+<span class="s1">x_train = vectorize_sequences(train_data)</span>
+<span class="s1">x_test = vectorize_sequences(test_data)</span>
+<span class="s0">#%% 
+# vectorize labels</span>
+<span class="s1">y_train = np.asarray(train_labels).astype(</span><span class="s4">'float32'</span><span class="s1">)</span>
+<span class="s1">y_test = np.asarray(test_labels).astype(</span><span class="s4">'float32'</span><span class="s1">)</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Building the Model 
+</span><span class="s0">#%% 
+# model definition</span>
+<span class="s2">from </span><span class="s1">tensorflow </span><span class="s2">import </span><span class="s1">keras</span>
+<span class="s2">from </span><span class="s1">tensorflow.keras </span><span class="s2">import </span><span class="s1">layers</span>
+
+<span class="s1">model = keras.Sequential([</span>
+    <span class="s1">layers.Dense(</span><span class="s3">16</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">16</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">1</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'sigmoid'</span><span class="s1">)</span>
+<span class="s1">])</span>
+<span class="s0">#%% 
+# compiling the model</span>
+<span class="s1">model.compile(</span>
+    <span class="s1">optimizer=</span><span class="s4">'rmsprop'</span><span class="s2">,</span>
+    <span class="s1">loss=</span><span class="s4">'binary_crossentropy'</span><span class="s2">,</span>
+    <span class="s1">metrics=[</span><span class="s4">'accuracy'</span><span class="s1">]</span>
+<span class="s1">)</span>
+<span class="s0">#%% 
+# set aside validation data to test how model performs on &quot;new&quot; data</span>
+<span class="s1">x_val = x_train[:</span><span class="s3">10000</span><span class="s1">]</span>
+<span class="s1">partial_x_train = x_train[</span><span class="s3">10000</span><span class="s1">:]</span>
+<span class="s1">y_val = y_train[:</span><span class="s3">10000</span><span class="s1">]</span>
+<span class="s1">partial_y_train = y_train[</span><span class="s3">10000</span><span class="s1">:]</span>
+<span class="s0">#%% 
+# training the model</span>
+<span class="s1">history = model.fit(</span>
+    <span class="s1">partial_x_train</span><span class="s2">,</span>
+    <span class="s1">partial_y_train</span><span class="s2">,</span>
+    <span class="s1">epochs=</span><span class="s3">20</span><span class="s2">,</span>
+    <span class="s1">batch_size=</span><span class="s3">512</span><span class="s2">,</span>
+    <span class="s1">validation_data=(x_val</span><span class="s2">, </span><span class="s1">y_val)</span>
+<span class="s1">)</span>
+<span class="s0">#%% 
+# plotting training and validation loss</span>
+<span class="s2">import </span><span class="s1">matplotlib.pyplot </span><span class="s2">as </span><span class="s1">plt</span>
+<span class="s1">history_dict = history.history</span>
+<span class="s1">loss_values = history_dict[</span><span class="s4">'loss'</span><span class="s1">]</span>
+<span class="s1">val_loss_values = history_dict[</span><span class="s4">'val_loss'</span><span class="s1">]</span>
+<span class="s1">epochs = range(</span><span class="s3">1</span><span class="s2">, </span><span class="s1">len(loss_values) + </span><span class="s3">1</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">loss_values</span><span class="s2">, </span><span class="s4">'bo'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Training Loss'</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">val_loss_values</span><span class="s2">, </span><span class="s4">'b'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Validation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s4">'Training &amp; Validation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s4">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s4">'Loss'</span><span class="s1">)</span>
+<span class="s1">plt.legend()</span>
+<span class="s1">plt.show()</span>
+<span class="s0">#%% 
+# plotting training and validation accuracy</span>
+<span class="s1">plt.clf() </span><span class="s0"># clears figure</span>
+<span class="s1">acc = history_dict[</span><span class="s4">'accuracy'</span><span class="s1">]</span>
+<span class="s1">val_acc = history_dict[</span><span class="s4">'val_accuracy'</span><span class="s1">]</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">acc</span><span class="s2">, </span><span class="s4">'bo'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Training Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">val_acc</span><span class="s2">, </span><span class="s4">'b'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Validation Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s4">'Training and Validation Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s4">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s4">'Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.legend()</span>
+<span class="s1">plt.show()</span>
+<span class="s0">#%% 
+# retrain the model without four epochs as to avoid overfitting/overoptimizing</span>
+<span class="s1">model = keras.Sequential([</span>
+    <span class="s1">layers.Dense(</span><span class="s3">16</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">16</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">1</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'sigmoid'</span><span class="s1">)</span>
+<span class="s1">])</span>
+<span class="s1">model.compile(</span>
+    <span class="s1">optimizer=</span><span class="s4">'rmsprop'</span><span class="s2">,</span>
+    <span class="s1">loss=</span><span class="s4">'binary_crossentropy'</span><span class="s2">,</span>
+    <span class="s1">metrics=[</span><span class="s4">'accuracy'</span><span class="s1">]</span>
+<span class="s1">)</span>
+
+<span class="s1">model.fit(x_train</span><span class="s2">, </span><span class="s1">y_train</span><span class="s2">, </span><span class="s1">epochs=</span><span class="s3">4</span><span class="s2">, </span><span class="s1">batch_size=</span><span class="s3">128</span><span class="s1">)</span>
+<span class="s0">#%% 
+</span><span class="s1">results = model.evaluate(x_test</span><span class="s2">, </span><span class="s1">y_test)</span>
+<span class="s0">#%% 
+</span><span class="s1">print(</span><span class="s4">f'Test Loss:</span><span class="s2">\t\t{</span><span class="s1">results[</span><span class="s3">0</span><span class="s1">]</span><span class="s2">:</span><span class="s4">.4f</span><span class="s2">}\n</span><span class="s4">Test Accuracy:</span><span class="s2">\t{</span><span class="s1">results[</span><span class="s3">1</span><span class="s1">]</span><span class="s2">:</span><span class="s4">.4f</span><span class="s2">}</span><span class="s4">'</span><span class="s1">)</span>
+<span class="s0">#%% 
+# predict on &quot;new&quot; data</span>
+<span class="s1">model.predict(x_test)</span>
+<span class="s0">#%% md 
+</span><span class="s1"># News Classifier 
+</span><span class="s0">#%% 
+# load reuters news dataset from keras</span>
+<span class="s2">from </span><span class="s1">tensorflow.keras.datasets </span><span class="s2">import </span><span class="s1">reuters</span>
+<span class="s1">(train_data</span><span class="s2">, </span><span class="s1">train_labels)</span><span class="s2">, </span><span class="s1">(test_data</span><span class="s2">, </span><span class="s1">test_labels) = reuters.load_data(num_words=</span><span class="s3">10000</span><span class="s1">)</span>
+<span class="s0">#%% 
+# check length of training and testing data</span>
+<span class="s1">print(len(train_data))</span>
+<span class="s1">print(len(test_data))</span>
+<span class="s0">#%% 
+# decode newswire back to text</span>
+<span class="s1">word_index = reuters.get_word_index()</span>
+<span class="s1">reverse_word_index = dict(</span>
+    <span class="s1">[(value</span><span class="s2">,</span><span class="s1">key) </span><span class="s2">for </span><span class="s1">(key</span><span class="s2">,</span><span class="s1">value) </span><span class="s2">in </span><span class="s1">word_index.items()]</span>
+<span class="s1">)</span>
+<span class="s1">decoded_newswire = </span><span class="s4">&quot; &quot;</span><span class="s1">.join(</span>
+    <span class="s1">[reverse_word_index.get(i - </span><span class="s3">3</span><span class="s2">, </span><span class="s4">'?'</span><span class="s1">) </span><span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">train_data[</span><span class="s3">0</span><span class="s1">]]</span>
+<span class="s1">)</span>
+<span class="s1">decoded_newswire</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Preparing the Data 
+</span><span class="s0">#%% 
+# vectorize input data</span>
+<span class="s1">x_train = vectorize_sequences(train_data)</span>
+<span class="s1">x_test = vectorize_sequences(test_data)</span>
+<span class="s0">#%% 
+# vectors labels using one-hot encoding</span>
+<span class="s2">def </span><span class="s1">to_one_hot(labels</span><span class="s2">, </span><span class="s1">dimension=</span><span class="s3">46</span><span class="s1">):</span>
+    <span class="s1">results = np.zeros((len(labels)</span><span class="s2">, </span><span class="s1">dimension))</span>
+    <span class="s2">for </span><span class="s1">i</span><span class="s2">, </span><span class="s1">label </span><span class="s2">in </span><span class="s1">enumerate(labels):</span>
+        <span class="s1">results[i</span><span class="s2">, </span><span class="s1">label] = </span><span class="s3">1.</span>
+    <span class="s2">return </span><span class="s1">results</span>
+<span class="s1">y_train = to_one_hot(train_labels)</span>
+<span class="s1">y_test = to_one_hot(test_labels)</span>
+<span class="s0">#%% 
+# one-hot encoding implementation built into keras</span>
+<span class="s2">from </span><span class="s1">tensorflow.keras.utils </span><span class="s2">import </span><span class="s1">to_categorical</span>
+<span class="s1">y_train = to_categorical(train_labels)</span>
+<span class="s1">y_test = to_categorical(test_labels)</span>
+<span class="s0">#%% 
+# have to use larger units than movie review as there are much</span>
+<span class="s0"># more dimensions for the different cats of news articles</span>
+<span class="s1">model = keras.Sequential([</span>
+    <span class="s1">layers.Dense(</span><span class="s3">64</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">64</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">46</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'softmax'</span><span class="s1">)</span>
+<span class="s1">])</span>
+<span class="s0">#%% 
+# compiling the model</span>
+<span class="s1">model.compile(</span>
+    <span class="s1">optimizer=</span><span class="s4">'rmsprop'</span><span class="s2">,</span>
+    <span class="s1">loss=</span><span class="s4">'categorical_crossentropy'</span><span class="s2">,</span>
+    <span class="s1">metrics=[</span><span class="s4">'accuracy'</span><span class="s1">]</span>
+<span class="s1">)</span>
+<span class="s0">#%% 
+# set aside validation set</span>
+<span class="s1">x_val = x_train[:</span><span class="s3">1000</span><span class="s1">]</span>
+<span class="s1">partial_x_train = x_train[</span><span class="s3">1000</span><span class="s1">:]</span>
+<span class="s1">y_val = y_train[:</span><span class="s3">1000</span><span class="s1">]</span>
+<span class="s1">partial_y_train = y_train[</span><span class="s3">1000</span><span class="s1">:]</span>
+<span class="s0">#%% 
+# training the model</span>
+<span class="s1">history = model.fit(</span>
+    <span class="s1">partial_x_train</span><span class="s2">,</span>
+    <span class="s1">partial_y_train</span><span class="s2">,</span>
+    <span class="s1">epochs=</span><span class="s3">20</span><span class="s2">,</span>
+    <span class="s1">batch_size=</span><span class="s3">512</span><span class="s2">,</span>
+    <span class="s1">validation_data=(x_val</span><span class="s2">, </span><span class="s1">y_val)</span>
+<span class="s1">)</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Plotting Losses To Determine Best # of Epochs 
+</span><span class="s0">#%% 
+# plot train and validation loss</span>
+<span class="s1">loss = history.history[</span><span class="s4">'loss'</span><span class="s1">]</span>
+<span class="s1">val_loss = history.history[</span><span class="s4">'val_loss'</span><span class="s1">]</span>
+<span class="s1">epochs = range(</span><span class="s3">1</span><span class="s2">, </span><span class="s1">len(loss) + </span><span class="s3">1</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">loss</span><span class="s2">, </span><span class="s4">'bo'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Training Loss'</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">val_loss</span><span class="s2">, </span><span class="s4">'b'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Validation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s4">'Training and validation loss'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s4">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s4">'Loss'</span><span class="s1">)</span>
+<span class="s1">plt.lenend()</span>
+<span class="s1">plt.show()</span>
+<span class="s0">#%% 
+# plotting train/validation accuracy</span>
+<span class="s1">plt.clf()</span>
+<span class="s1">acc = history.history[</span><span class="s4">'accuracy'</span><span class="s1">]</span>
+<span class="s1">val_acc = history.history[</span><span class="s4">'val_accuracy'</span><span class="s1">]</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">acc</span><span class="s2">, </span><span class="s4">'bo'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Training Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs</span><span class="s2">, </span><span class="s1">val_acc</span><span class="s2">, </span><span class="s4">'b'</span><span class="s2">, </span><span class="s1">label=</span><span class="s4">'Validation Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s4">'Training and validation accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s4">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s4">'Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.lenged()</span>
+<span class="s1">plt.show()</span>
+<span class="s0">#%% md 
+</span><span class="s1">It would appear that the values seem to level/taper around 9 epochs 
+</span><span class="s0">#%% 
+# retrain model with &quot;better&quot; # of epochs</span>
+<span class="s1">model = keras.Sequential([</span>
+    <span class="s1">layers.Dense(</span><span class="s3">64</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">64</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+    <span class="s1">layers.Dense(</span><span class="s3">46</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'softmax'</span><span class="s1">)</span>
+<span class="s1">])</span>
+<span class="s1">model.compile(</span>
+    <span class="s1">optimizer=</span><span class="s4">'rmsprop'</span><span class="s2">,</span>
+    <span class="s1">loss=</span><span class="s4">'categorical_crossentropy'</span><span class="s2">,</span>
+    <span class="s1">metrics=[</span><span class="s4">'accuracy'</span><span class="s1">]</span>
+<span class="s1">)</span>
+<span class="s1">model.fit(</span>
+    <span class="s1">x_train</span><span class="s2">,</span>
+    <span class="s1">y_train</span><span class="s2">,</span>
+    <span class="s1">epochs=</span><span class="s3">9</span><span class="s2">,</span>
+    <span class="s1">batch_size=</span><span class="s3">512</span>
+<span class="s1">)</span>
+<span class="s1">results = model.evaluate(x_test</span><span class="s2">, </span><span class="s1">y_test)</span>
+<span class="s0">#%% 
+</span><span class="s1">print(</span><span class="s4">f'Test loss:</span><span class="s2">\t{</span><span class="s1">results[</span><span class="s3">0</span><span class="s1">]</span><span class="s2">:</span><span class="s4">.4f</span><span class="s2">}\n</span><span class="s4">Test Acc:</span><span class="s2">\t{</span><span class="s1">results[</span><span class="s3">1</span><span class="s1">]</span><span class="s2">:</span><span class="s4">.4f</span><span class="s2">}</span><span class="s4">'</span><span class="s1">)</span>
+<span class="s0">#%% 
+# check accuracy of random baseline</span>
+<span class="s2">import </span><span class="s1">copy</span>
+<span class="s1">test_labels_copy = copy.copy(test_labels)</span>
+<span class="s1">np.random.shuffle(test_labels_copy)</span>
+<span class="s1">hits_array = np.array(test_labels) == np.array(test_labels_copy)</span>
+<span class="s1">hits_array.mean()</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Generate predictions on new data 
+</span><span class="s0">#%% 
+</span><span class="s1">preds = model.predict(x_test)</span>
+<span class="s0">#%% 
+</span><span class="s1">preds[</span><span class="s3">0</span><span class="s1">].shape</span>
+<span class="s0">#%% 
+# coefficients of vector values should be 1 as it forms a probability distribution</span>
+<span class="s1">np.sum(preds[</span><span class="s3">0</span><span class="s1">])</span>
+<span class="s0">#%% 
+# class with highest probability</span>
+<span class="s1">np.argmax(preds[</span><span class="s3">0</span><span class="s1">])</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Housing Price Regression Model 
+</span><span class="s0">#%% 
+# load boston housing price data from keras</span>
+<span class="s2">from </span><span class="s1">tensorflow.keras.datasets </span><span class="s2">import </span><span class="s1">boston_housing</span>
+<span class="s1">(train_data</span><span class="s2">, </span><span class="s1">train_targets)</span><span class="s2">, </span><span class="s1">(test_data</span><span class="s2">, </span><span class="s1">test_targets) = boston_housing.load_data()</span>
+<span class="s0">#%% 
+</span><span class="s1">print(train_data.shape)</span>
+<span class="s1">print(test_data.shape)</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Preparing the data 
+</span><span class="s0">#%% 
+# feature-wise normalization to account for different ranges of measured observations</span>
+<span class="s1">mean = train_data.mean(axis=</span><span class="s3">0</span><span class="s1">)</span>
+<span class="s1">train_data -= mean</span>
+<span class="s1">std = train_data.std(axis=</span><span class="s3">0</span><span class="s1">)</span>
+<span class="s1">train_data /= std</span>
+<span class="s1">test_data -= mean</span>
+<span class="s1">test_data /= std</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Model Definition 
+</span><span class="s0">#%% 
+#</span>
+<span class="s2">def </span><span class="s1">build_model():</span>
+    <span class="s1">model = keras.Sequential([</span>
+        <span class="s1">layers.Dense(</span><span class="s3">64</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+        <span class="s1">layers.Dense(</span><span class="s3">64</span><span class="s2">, </span><span class="s1">activation=</span><span class="s4">'relu'</span><span class="s1">)</span><span class="s2">,</span>
+        <span class="s1">layers.Dense(</span><span class="s3">1</span><span class="s1">) </span><span class="s0"># no activation as it is a linear layer</span>
+    <span class="s1">])</span>
+    <span class="s1">model.compile(</span>
+        <span class="s1">optimizer=</span><span class="s4">'rmsprop'</span><span class="s2">,</span>
+        <span class="s1">loss=</span><span class="s4">'mse'</span><span class="s2">,</span>
+        <span class="s1">metrics=[</span><span class="s4">'mae'</span><span class="s1">]</span>
+    <span class="s1">)</span>
+    <span class="s2">return </span><span class="s1">model</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Validation via K-fold Validation 
+</span><span class="s0">#%% 
+</span><span class="s1">k = </span><span class="s3">4</span>
+<span class="s1">num_val_samples = len(train_data) // k</span>
+<span class="s1">num_epochs = </span><span class="s3">100</span>
+<span class="s1">all_scores = []</span>
+<span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(k):</span>
+    <span class="s1">print(</span><span class="s4">f'Processing fold #</span><span class="s2">{</span><span class="s1">i</span><span class="s2">}</span><span class="s4">'</span><span class="s1">)</span>
+    <span class="s1">val_data = train_data[i * num_val_samples: (i + </span><span class="s3">1</span><span class="s1">) * num_val_samples]</span>
+    <span class="s1">val_targets = train_targets[i * num_val_samples: (i + </span><span class="s3">1</span><span class="s1">) * num_val_samples]</span>
+    <span class="s1">partial_train_data = np.concatenate(</span>
+        <span class="s1">[train_data[:i * num_val_samples]</span><span class="s2">,</span>
+         <span class="s1">train_data[(i + </span><span class="s3">1</span><span class="s1">) * num_val_samples:]]</span><span class="s2">,</span>
+        <span class="s1">axis=</span><span class="s3">0</span>
+    <span class="s1">)</span>
+    <span class="s1">partial_train_targets = np.concatenate(</span>
+        <span class="s1">[train_targets[:i * num_val_samples]</span><span class="s2">,</span>
+         <span class="s1">train_targets[(i + </span><span class="s3">1</span><span class="s1">) * num_val_samples:]]</span><span class="s2">,</span>
+        <span class="s1">axis=</span><span class="s3">0</span>
+    <span class="s1">)</span>
+    <span class="s1">model = build_model()</span>
+    <span class="s1">model.fit(</span>
+        <span class="s1">partial_train_data</span><span class="s2">,</span>
+        <span class="s1">partial_train_targets</span><span class="s2">,</span>
+        <span class="s1">epochs=num_epochs</span><span class="s2">,</span>
+        <span class="s1">batch_size=</span><span class="s3">16</span><span class="s2">,</span>
+        <span class="s1">verbose=</span><span class="s3">0</span>
+    <span class="s1">)</span>
+    <span class="s1">val_mse</span><span class="s2">, </span><span class="s1">val_mae = model.evaluate(val_data</span><span class="s2">, </span><span class="s1">val_targets</span><span class="s2">, </span><span class="s1">verbose=</span><span class="s3">0</span><span class="s1">)</span>
+    <span class="s1">all_scores.append(val_mae)</span>
+<span class="s0">#%% 
+</span><span class="s1">all_scores</span>
+<span class="s0">#%% 
+</span><span class="s1">np.mean(all_scores)</span>
+<span class="s0">#%% 
+# same implementation but saving validation logs</span>
+<span class="s1">num_epochs = </span><span class="s3">500</span>
+<span class="s1">all_mae_histories = []</span>
+<span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(k):</span>
+    <span class="s1">print(</span><span class="s4">f'Processing fold #</span><span class="s2">{</span><span class="s1">i</span><span class="s2">}</span><span class="s4">'</span><span class="s1">)</span>
+    <span class="s1">val_data = train_data[i * num_val_samples: (i + </span><span class="s3">1</span><span class="s1">) * num_val_samples]</span>
+    <span class="s1">val_targets = train_targets[i * num_val_samples: (i + </span><span class="s3">1</span><span class="s1">) * num_val_samples]</span>
+    <span class="s1">partial_train_data = np.concatenate(</span>
+        <span class="s1">[train_data[:i * num_val_samples]</span><span class="s2">,</span>
+         <span class="s1">train_data[(i + </span><span class="s3">1</span><span class="s1">) * num_val_samples:]]</span><span class="s2">,</span>
+        <span class="s1">axis=</span><span class="s3">0</span>
+    <span class="s1">)</span>
+    <span class="s1">partial_train_targets = np.concatenate(</span>
+        <span class="s1">[train_targets[:i * num_val_samples]</span><span class="s2">,</span>
+         <span class="s1">train_targets[(i + </span><span class="s3">1</span><span class="s1">) * num_val_samples:]]</span><span class="s2">,</span>
+        <span class="s1">axis=</span><span class="s3">0</span>
+    <span class="s1">)</span>
+    <span class="s1">model = build_model()</span>
+    <span class="s1">history = model.fit(</span>
+        <span class="s1">partial_train_data</span><span class="s2">,</span>
+        <span class="s1">partial_train_targets</span><span class="s2">,</span>
+        <span class="s1">validation_data=(val_data</span><span class="s2">, </span><span class="s1">val_targets)</span><span class="s2">,</span>
+        <span class="s1">epochs=num_epochs</span><span class="s2">,</span>
+        <span class="s1">batch_size=</span><span class="s3">16</span><span class="s2">,</span>
+        <span class="s1">verbose=</span><span class="s3">0</span>
+    <span class="s1">)</span>
+    <span class="s1">mae_history = history.history[</span><span class="s4">'val_mae'</span><span class="s1">]</span>
+    <span class="s1">all_mae_histories.append(mae_history)</span>
+<span class="s0">#%% 
+# build history of successive mean k-fold validation scores</span>
+<span class="s1">average_mae_history = [</span>
+    <span class="s1">np.mean([x[i] </span><span class="s2">for </span><span class="s1">x </span><span class="s2">in </span><span class="s1">all_mae_histories]) </span><span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(num_epochs)</span>
+<span class="s1">]</span>
+<span class="s0">#%% 
+# plot validation scores</span>
+<span class="s1">plt.plot(range(</span><span class="s3">1</span><span class="s2">, </span><span class="s1">len(average_mae_history) + </span><span class="s3">1</span><span class="s1">)</span><span class="s2">, </span><span class="s1">average_mae_history)</span>
+<span class="s1">plt.xlabel(</span><span class="s4">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s4">'Validation MAE'</span><span class="s1">)</span>
+<span class="s1">plt.show()</span>
+<span class="s0">#%% 
+# omit first few data points and re-draw the plot</span>
+<span class="s1">truncated_mae_history = average_mae_history[</span><span class="s3">10</span><span class="s1">:]</span>
+<span class="s1">plt.plot(range(</span><span class="s3">1</span><span class="s2">, </span><span class="s1">len(truncated_mae_history) + </span><span class="s3">1</span><span class="s1">)</span><span class="s2">, </span><span class="s1">truncated_mae_history)</span>
+<span class="s1">plt.xlabel(</span><span class="s4">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s4">'Validation MAE'</span><span class="s1">)</span>
+<span class="s1">plt.show()</span>
+<span class="s0">#%% 
+## Training Final Model</span>
+<span class="s0">#%% 
+# retrain model with &quot;better&quot; # of epochs</span>
+<span class="s1">model = build_model()</span>
+<span class="s1">model.fit(</span>
+    <span class="s1">train_data</span><span class="s2">,</span>
+    <span class="s1">train_targets</span><span class="s2">,</span>
+    <span class="s1">epochs=</span><span class="s3">130</span><span class="s2">,</span>
+    <span class="s1">batch_size=</span><span class="s3">16</span><span class="s2">,</span>
+    <span class="s1">verbose=</span><span class="s3">0</span>
+<span class="s1">)</span>
+<span class="s1">test_mse_score</span><span class="s2">, </span><span class="s1">test_mae_score = model.evaluate(test_data</span><span class="s2">, </span><span class="s1">test_targets)</span>
+<span class="s0">#%% 
+</span><span class="s1">test_mae_score</span>
+<span class="s0">#%% md 
+</span><span class="s1">## Generate Predictions on New Data 
+</span><span class="s0">#%% 
+</span><span class="s1">preds = model.predict(test_data)</span>
+<span class="s1">preds[</span><span class="s3">0</span><span class="s1">]</span></pre>
+</body>
+</html>
