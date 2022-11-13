@@ -1,0 +1,68 @@
+{
+  "619, dyer": {
+    "visit_id": 619,
+    "person_id": "dyer",
+    "quantity": "sal",
+    "reading": 0.13
+  },
+  "622, dyer": {
+    "visit_id": 622,
+    "person_id": "dyer",
+    "quantity": "sal",
+    "reading": 0.09
+  },
+  "734, pb": {
+    "visit_id": 734,
+    "person_id": "pb",
+    "quantity": "temp",
+    "reading": -21.5
+  },
+  "734, lake": {
+    "visit_id": 734,
+    "person_id": "lake",
+    "quantity": "sal",
+    "reading": 0.05
+  },
+  "735, pb": {
+    "visit_id": 735,
+    "person_id": "pb",
+    "quantity": "temp",
+    "reading": -26.0
+  },
+  "751, pb": {
+    "visit_id": 751,
+    "person_id": "pb",
+    "quantity": "temp",
+    "reading": -18.5
+  },
+  "752, lake": {
+    "visit_id": 752,
+    "person_id": "lake",
+    "quantity": "temp",
+    "reading": -16.0
+  },
+  "752, roe": {
+    "visit_id": 752,
+    "person_id": "roe",
+    "quantity": "sal",
+    "reading": 41.6
+  },
+  "837, lake": {
+    "visit_id": 837,
+    "person_id": "lake",
+    "quantity": "sal",
+    "reading": 0.21
+  },
+  "837, roe": {
+    "visit_id": 837,
+    "person_id": "roe",
+    "quantity": "sal",
+    "reading": 22.5
+  },
+  "844, roe": {
+    "visit_id": 844,
+    "person_id": "roe",
+    "quantity": "rad",
+    "reading": 11.25
+  }
+}
